@@ -6,7 +6,19 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+// 1. Define your allowed origins
+const allowedOrigins = [
+  process.env.FRONTEND_URL, 
+  'http://localhost:5174',
+  'http://127.0.0.1:5174' // Often good to include the IP version for local dev
+].filter(Boolean); // This removes the env variable from the list if it's undefined
+
+// 2. Update the CORS middleware
+app.use(cors({ 
+  origin: allowedOrigins, 
+  credentials: true 
+}));
+
 app.use(express.json());
 app.get('/',(req,res)=>{res.send("This is Backend");})
 

@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
-const db = require('../db/database');
+const { get } = require('../db/database');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_dev_key_change_in_prod';
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided' });
@@ -11,7 +11,7 @@ function authenticate(req, res, next) {
   const token = auth.split(' ')[1];
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(payload.id);
+    const user = await get('SELECT id, name, email, role FROM users WHERE id = ?', [payload.id]);
     if (!user) return res.status(401).json({ error: 'User not found' });
     req.user = user;
     next();
@@ -20,22 +20,16 @@ function authenticate(req, res, next) {
   }
 }
 
-function requireAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-  next();
-}
-
-function requireProjectAdmin(req, res, next) {
+async function requireProjectAdmin(req, res, next) {
   const projectId = parseInt(req.params.projectId || req.body.project_id);
   if (!projectId) return res.status(400).json({ error: 'Project ID required' });
 
-  const membership = db.prepare(
-    'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?'
-  ).get(projectId, req.user.id);
+  const membership = await get(
+    'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?',
+    [projectId, req.user.id]
+  );
 
-  const project = db.prepare('SELECT owner_id FROM projects WHERE id = ?').get(projectId);
+  const project = await get('SELECT owner_id FROM projects WHERE id = ?', [projectId]);
 
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
@@ -52,4 +46,4 @@ function requireProjectAdmin(req, res, next) {
   return res.status(403).json({ error: 'Not a member of this project' });
 }
 
-module.exports = { authenticate, requireAdmin, requireProjectAdmin, JWT_SECRET };
+module.exports = { authenticate, requireProjectAdmin, JWT_SECRET };
